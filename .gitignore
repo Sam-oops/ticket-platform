@@ -1,0 +1,17 @@
+node_modules/
+.next/
+dist/
+coverage/
+
+.env
+.env.local
+*.local
+
+# загруженные обложки событий (Этап 4) — том Docker'а, не репозиторий
+uploads/
+
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/
+.idea/

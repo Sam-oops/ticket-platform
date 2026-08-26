@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+
+    // nodenext = резолвинг как у настоящего Node в ESM-режиме.
+    // Практическое следствие, из-за которого спотыкаются все: в относительных
+    // импортах пиши расширение .js, даже если файл называется .ts —
+    //     import { HttpError } from "./lib/HttpError.js";
+    // Путь резолвится Node'ом ПОСЛЕ компиляции, когда файл уже .js. TypeScript
+    // намеренно не переписывает пути. Одно правило, дальше на автомате.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Заставляет писать `import type { Foo }` для того, что нужно только типам.
+    // Не придирка: без этого рантайм-импорт "ради типа" тянет модуль в бандл
+    // и ломает порядок сайд-эффектов.
+    "verbatimModuleSyntax": true,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"]
+}

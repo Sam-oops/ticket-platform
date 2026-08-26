@@ -1,0 +1,15 @@
+# Только для разработки: исходники приходят bind-mount'ом, tsx следит за файлами.
+# Продакшн-образ (multi-stage, npm ci --omit=dev) появится на Этапе 11, если понадобится.
+FROM node:24-alpine
+
+WORKDIR /app
+
+# Отдельный слой зависимостей: пересобирается при изменении package*.json,
+# а не на каждую правку исходника.
+COPY package.json package-lock.json* ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 4000
+CMD ["npm", "run", "dev"]

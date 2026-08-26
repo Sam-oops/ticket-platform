@@ -1,0 +1,70 @@
+name: venu
+
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: venu-mongo
+    # --replSet обязателен: без него нет транзакций (см. docker/mongo/rs-init.js).
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      # Хост-порт 27018, а не 27017: 27017 занят BITO (bito-mongo-1) и ssh-туннелем.
+      # Внутри compose-сети порт остаётся 27017 — конфиг replica set от этого не зависит.
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Проверяем, что mongod отвечает — а НЕ что replica set инициализирован.
+      # Инициализацию делает отдельный сервис ниже.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  # Одноразовый сервис: инициализирует replica set и завершается с кодом 0.
+  # Отдельный контейнер, а не healthcheck-хак, потому что "поднять mongod" и
+  # "сконфигурировать кластер" — разные операции с разными условиями готовности.
+  mongo-init:
+    image: mongo:8.0
+    container_name: venu-mongo-init
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ./docker/mongo/rs-init.sh:/scripts/rs-init.sh:ro
+    entrypoint: ["bash", "/scripts/rs-init.sh"]
+    restart: "no"
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
+    container_name: venu-server
+    depends_on:
+      # Не service_started и не service_healthy у mongo, а именно
+      # "init отработал успешно" — иначе сервер стартует до выборов PRIMARY.
+      mongo-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      # Перекрывает значение из .env: внутри сети всегда "mongo", даже если
+      # в .env для хост-запусков стоит directConnection на 127.0.0.1.
+      MONGODB_URI: mongodb://mongo:27017/venu?replicaSet=rs0
+      PORT: "4000"
+    ports:
+      # Хост-порт 4001, а не 4000: 4000 занят BITO (bito-backend-1).
+      # Внутри контейнера сервер по-прежнему слушает 4000.
+      - "4001:4000"
+    volumes:
+      - ./server:/app
+      # Анонимный том поверх bind-mount: node_modules контейнера (linux/arm64)
+      # не затираются node_modules хоста (darwin/arm64). Без этой строки нативные
+      # модули — bcrypt на Этапе 2 — упадут с "invalid ELF header".
+      - /app/node_modules
+      - uploads:/app/uploads
+    command: npm run dev
+
+volumes:
+  mongo-data:
+  uploads:
